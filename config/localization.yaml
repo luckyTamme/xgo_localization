@@ -1,0 +1,50 @@
+/**:
+  ros__parameters:
+
+    # --- inputs ----------------------------------------------------------
+    # Absolute names so they resolve at the root even though the node runs
+    # inside /localization.
+    velocity_topic: /xgo/applied_vel
+    imu_topic: /imu/data
+
+    # --- frames ----------------------------------------------------------
+    map_frame: map
+    odom_frame: odom
+    base_frame: base_link
+    laser_frame: base_laser
+
+    # --- laser mount -----------------------------------------------------
+    # x y z roll pitch yaw, base_link -> base_laser.
+    # MEASURE THIS PER ROBOT. The LiDAR is a retrofit, so no robot description
+    # contains it and nothing else publishes the transform. Height error is
+    # mostly harmless for 2D SLAM; pitch or roll error biases every range and
+    # shows up as systematic drift, so check that the mount is level.
+    laser_transform: [0.0, 0.0, 0.18, 0.0, 0.0, 0.0]
+
+    # --- odometry --------------------------------------------------------
+    avodom:
+      # Take heading from the IMU's fused orientation. Setting this false
+      # dead-reckons heading from the commanded yaw rate instead, which is
+      # markedly worse and exists mainly for comparison.
+      use_imu_heading: true
+      # Skip integration steps longer than this, so a pause or a dropped
+      # message cannot produce one huge jump.
+      max_dt_s: 0.5
+      # The applied velocity is already metric; these exist for platforms
+      # where that is not true.
+      scale_vx: 1.0
+      scale_vy: 1.0
+
+    # --- pose arbitration ------------------------------------------------
+    arbiter:
+      # The pose is published at this rate no matter what the backend does.
+      publish_rate_hz: 20.0
+      # No map -> odom correction newer than this means degraded.
+      stale_after_s: 1.0
+      # Covariance is two fixed states, not a growth curve: TF carries no
+      # covariance to propagate, so anything smoother would be invented
+      # precision. Nominal values, not calibrated.
+      healthy_xy_var: 0.01
+      healthy_yaw_var: 0.02
+      degraded_xy_var: 1.0
+      degraded_yaw_var: 0.5

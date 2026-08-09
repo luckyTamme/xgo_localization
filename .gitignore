@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+build/
+install/
+log/
+.pytest_cache/
+.DS_Store
+
+# Planning notes, local only
+plan.md

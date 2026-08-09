@@ -1,0 +1,50 @@
+# rtabmap as a 2D LiDAR SLAM backend.
+#
+# Wildcard node name so this file applies wherever the node is namespaced.
+/**:
+  ros__parameters:
+    frame_id: base_link
+    map_frame_id: map
+    # Setting odom_frame_id makes rtabmap read odometry from TF rather than a
+    # topic. The localisation node already publishes odom -> base_link, so no
+    # odometry subscription and no icp_odometry helper are needed.
+    odom_frame_id: odom
+
+    subscribe_scan: true
+    subscribe_depth: false
+    subscribe_rgb: false
+    approx_sync: true
+    sync_queue_size: 30
+
+    # Publish a latched OccupancyGrid so a viewer joining late still sees the map.
+    latch: true
+    map_always_update: true
+    map_cleanup: true
+
+    # --- RTAB-Map library parameters -------------------------------------
+    # These are the slash-named ones. They MUST be strings: the node rejects
+    # native bool/double for them with "invalid type ... not allowed". The
+    # quoting below is load-bearing, not stylistic.
+    Reg/Strategy: '1'                      # ICP registration (no visual features)
+    Reg/Force3DoF: 'true'                  # planar robot: lock z, roll, pitch
+
+    RGBD/CreateOccupancyGrid: 'true'
+    RGBD/NeighborLinkRefining: 'true'
+    RGBD/ProximityBySpace: 'true'
+    RGBD/ProximityPathMaxNeighbors: '10'
+
+    Grid/Sensor: '0'                       # build the grid from the laser, not depth
+    Grid/CellSize: '0.05'
+    Grid/RangeMin: '0.12'
+    Grid/RangeMax: '12.0'
+    Grid/NormalsSegmentation: 'false'
+
+    Icp/VoxelSize: '0.05'
+    Icp/MaxCorrespondenceDistance: '0.15'
+    Icp/PointToPlane: 'false'
+    Icp/Iterations: '30'
+    Icp/CorrespondenceRatio: '0.2'
+
+    # Register every frame instead of sampling keyframes. The default rate
+    # discards most of the trajectory on a slow-moving quadruped.
+    Rtabmap/DetectionRate: '0'

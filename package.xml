@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>xgo_localization</name>
+  <version>0.1.0</version>
+  <description>
+    Localisation for the XGO2 quadruped: the robot's pose relative to where it
+    started, published continuously, with a selectable SLAM backend
+    (cartographer or rtabmap).
+  </description>
+  <maintainer email="17968111+luckyTamme@users.noreply.github.com">Tamme</maintainer>
+  <license>Apache-2.0</license>
+
+  <url type="repository">https://github.com/luckyTamme/xgo_localization</url>
+
+  <exec_depend>rclpy</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>diagnostic_msgs</exec_depend>
+
+  <!-- SLAM backends. Both are installed so `backend:=` can pick either at
+       launch time without a rebuild. -->
+  <exec_depend>cartographer_ros</exec_depend>
+  <exec_depend>rtabmap_slam</exec_depend>
+
+  <!-- Launch-time only. -->
+  <exec_depend>launch</exec_depend>
+  <exec_depend>launch_ros</exec_depend>
+  <exec_depend>ament_index_python</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
