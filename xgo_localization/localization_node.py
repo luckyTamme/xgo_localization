@@ -127,7 +127,22 @@ class LocalizationNode(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._tf_broadcaster = TransformBroadcaster(self)
         self._static_tf_broadcaster = StaticTransformBroadcaster(self)
+        self._laser_transform = laser_transform
         self._publish_laser_transform(laser_transform)
+
+        # Re-send the static transform periodically. In principle the latched
+        # /tf_static publication reaches late subscribers by itself, but that
+        # relies on every hop preserving transient-local durability. It takes
+        # only one intermediary negotiating down to volatile — a bridge facing a
+        # second, volatile publisher of /tf_static, say — for a consumer that
+        # connects mid-run to never learn where the LiDAR is, silently and
+        # permanently. A handful of bytes every few seconds buys that back.
+        # Set to 0 to publish once only.
+        static_tf_period_s = self._param('static_tf_period_s', 5.0)
+        if static_tf_period_s > 0.0:
+            self.create_timer(
+                static_tf_period_s,
+                lambda: self._publish_laser_transform(self._laser_transform, quiet=True))
 
         # Relative names: the launch file pushes this node into /localization,
         # so these become /localization/odom and /localization/pose.
@@ -172,7 +187,7 @@ class LocalizationNode(Node):
 
     # ------------------------------------------------------------------ startup
 
-    def _publish_laser_transform(self, xyz_rpy) -> None:
+    def _publish_laser_transform(self, xyz_rpy, quiet: bool = False) -> None:
         if len(xyz_rpy) != 6:
             raise ValueError(
                 f'laser_transform needs 6 values (x y z roll pitch yaw), got {len(xyz_rpy)}')
@@ -192,6 +207,8 @@ class LocalizationNode(Node):
         transform.transform.rotation.w = qw
         self._static_tf_broadcaster.sendTransform(transform)
 
+        if quiet:
+            return
         self.get_logger().info(
             f'publishing static {self._base_frame} -> {self._laser_frame}: '
             f'xyz=({x:g}, {y:g}, {z:g}) rpy=({roll:g}, {pitch:g}, {yaw:g}). '

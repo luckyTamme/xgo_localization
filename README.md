@@ -210,6 +210,7 @@ The `ERROR` level is the one to alarm on. `WARN` means degraded but moving;
 | Replay: pose jumps or diagnostics say "different clocks" | `use_sim_time` mismatch | pass `use_sim_time:=true` **and** `ros2 bag play --clock` |
 | Pose drifts steadily to one side | laser mount not level | re-measure `laser_transform`, especially roll and pitch |
 | Topics at `/pose` instead of `/localization/pose` | node started with `ros2 run` | use the launch file; it supplies the namespace |
+| A viewer reports `base_laser` missing but SLAM works fine | joined after the one-shot static transform | should self-heal within `static_tf_period_s`; if not, reconnect |
 
 ---
 
@@ -264,6 +265,13 @@ If this transform is missing entirely, SLAM backends drop every scan on an
 unknown frame and produce an empty map with no error message — which is why it is
 published unconditionally rather than left to the integrator.
 
+It is also **re-sent every few seconds**, not just once. A latched `/tf_static`
+is supposed to reach late subscribers on its own, but that only holds if every
+hop preserves transient-local durability — one intermediary negotiating down to
+volatile is enough for a consumer that connects mid-run to never learn where the
+LiDAR is. Anything attaching to a running system is affected, viewers and
+`ros2 bag record` alike.
+
 ---
 
 ## Parameters
@@ -277,6 +285,7 @@ comments. The ones worth knowing:
 | `imu_topic` | `/imu/data` | orientation input |
 | `map_frame` / `odom_frame` / `base_frame` / `laser_frame` | `map` / `odom` / `base_link` / `base_laser` | frame names, for running two instances |
 | `laser_transform` | `[0.0, 0.0, 0.18, 0.0, 0.0, 0.0]` | `base_link -> base_laser`, measure per robot |
+| `static_tf_period_s` | `5.0` | re-send the static transform this often, so late joiners still get it. `0` publishes once |
 | `input_timeout_s` | `2.0` | no IMU for this long reports `ERROR` |
 | `avodom.use_imu_heading` | `true` | heading from the IMU; false dead-reckons it instead |
 | `avodom.max_dt_s` | `0.5` | skip integration steps longer than this |

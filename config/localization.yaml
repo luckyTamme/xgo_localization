@@ -20,6 +20,10 @@
     # mostly harmless for 2D SLAM; pitch or roll error biases every range and
     # shows up as systematic drift, so check that the mount is level.
     laser_transform: [0.0, 0.0, 0.18, 0.0, 0.0, 0.0]
+    # Re-send the static transform this often, so anything that connects
+    # mid-run still learns where the LiDAR is even if a hop between us and it
+    # dropped transient-local durability. 0 publishes once only.
+    static_tf_period_s: 5.0
 
     # --- odometry --------------------------------------------------------
     avodom:
