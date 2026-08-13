@@ -45,6 +45,9 @@ class PoseArbiter:
     :param healthy_yaw_var: yaw variance (rad^2) while the backend is healthy.
     :param degraded_xy_var: position variance (m^2) while dead-reckoning.
     :param degraded_yaw_var: yaw variance (rad^2) while dead-reckoning.
+    :param loop_back_s: the clock jumping backwards by more than this many
+        seconds is treated as a replay loop rather than a clock mismatch. See
+        :meth:`note_time`.
     """
 
     def __init__(
@@ -55,6 +58,7 @@ class PoseArbiter:
         degraded_xy_var: float = 1.0,
         degraded_yaw_var: float = 0.5,
         future_tolerance_s: float = 0.5,
+        loop_back_s: float = 1.0,
     ) -> None:
         self.stale_after_s = stale_after_s
         self.future_tolerance_s = future_tolerance_s
@@ -62,9 +66,12 @@ class PoseArbiter:
         self.healthy_yaw_var = healthy_yaw_var
         self.degraded_xy_var = degraded_xy_var
         self.degraded_yaw_var = degraded_yaw_var
+        self.loop_back_s = loop_back_s
 
         self._last_correction_t: float | None = None
         self._ever_corrected = False
+        self._prev_now: float | None = None
+        self._looped = False
 
     # ------------------------------------------------------------------ inputs
 
@@ -72,6 +79,31 @@ class PoseArbiter:
         """Record that a ``map -> odom`` correction was observed at time ``t``."""
         self._last_correction_t = t
         self._ever_corrected = True
+
+    def note_time(self, now: float) -> bool:
+        """Observe the current time, reporting whether the clock looped.
+
+        A bag replayed with ``--loop`` restarts its clock, and the correction
+        recorded during the previous pass is then stamped far *ahead* of the
+        restarted clock. Left alone that reads exactly like the genuine
+        different-clocks fault below, and it never expires: every subsequent
+        tick compares a fresh early ``now`` against a stale late correction, so
+        the node would stay degraded for the rest of the run and blame
+        ``use_sim_time`` while doing it.
+
+        Dropping the correction history on the jump lets the backend's next
+        correction — which arrives stamped on the restarted clock — restore
+        health normally. ``ever_corrected`` deliberately survives: the backend
+        keeps its accumulated map across a loop, so it has still corrected.
+
+        :returns: ``True`` on the tick where a backward jump was detected.
+        """
+        previous, self._prev_now = self._prev_now, now
+        looped = previous is not None and now - previous < -self.loop_back_s
+        if looped:
+            self._last_correction_t = None
+            self._looped = True
+        return looped
 
     # ----------------------------------------------------------------- queries
 
@@ -87,6 +119,10 @@ class PoseArbiter:
         and the backend are reading different clocks — almost always a
         ``use_sim_time`` mismatch. Clamping that to zero would report the
         healthiest possible state at exactly the moment the setup is broken.
+
+        The one benign way to get a future stamp is a replay loop, and that is
+        removed upstream by :meth:`note_time` rather than tolerated here, so a
+        future stamp reaching this point really is a clock fault.
         """
         if self._last_correction_t is None:
             return None
@@ -119,6 +155,9 @@ class PoseArbiter:
         state = self.state(now)
         age = self.seconds_since_correction(now)
         if age is None:
+            if self._looped:
+                return state, ('replay looped; waiting for the first map->odom '
+                               'on the restarted clock')
             return state, 'no map->odom correction yet; dead reckoning from odometry'
         if age < -self.future_tolerance_s:
             return state, (

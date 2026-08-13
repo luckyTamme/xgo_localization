@@ -192,6 +192,7 @@ The `ERROR` level is the one to alarm on. `WARN` means degraded but moving;
 |---|---|
 | `state` | `healthy` or `degraded` |
 | `map_to_odom_age_s` | age of the newest correction, or `never`. **Signed** — a negative value means the backend stamps ahead of us, which is normal for rtabmap. A large negative value means a clock mismatch. |
+| — | a bag restarting is *not* reported as a clock mismatch: a backward jump in the clock is recognised as a replay loop, and the correction recorded against the old clock is dropped rather than read as one arriving from the future. `ever_corrected` survives it. |
 | `ever_corrected` | has the backend ever produced a correction |
 | `imu_age_s` | seconds since the last IMU message, or `never` |
 | `applied_vel_age_s` | seconds since the last velocity message, or `never` |
@@ -207,7 +208,8 @@ The `ERROR` level is the one to alarm on. `WARN` means degraded but moving;
 | Pose never leaves `degraded`, map stays empty | the backend is getting no scans | check `scan_topic` and that `/scan` is on frame `base_laser` |
 | Pose barely moves while the robot drives | `applied_vel_age_s` growing — no velocity source | confirm the `xgo_ros` fork is running and publishing `/xgo/applied_vel` |
 | Everything looks right but there is no `map` frame | backend has not converged yet | expected at startup; if it persists, the backend is not publishing `map -> odom` |
-| Replay: pose jumps or diagnostics say "different clocks" | `use_sim_time` mismatch | pass `use_sim_time:=true` **and** `ros2 bag play --clock` |
+| Replay: pose jumps or diagnostics say "different clocks" | `use_sim_time` mismatch — genuinely, now that a replay loop is no longer mistaken for one | pass `use_sim_time:=true` **and** `ros2 bag play --clock` |
+| Replay: stuck at `replay looped; waiting for the first map->odom` | the bag rewound under a backend that cannot go back — cartographer drops every scan stamped before its trajectory time and stops correcting for good | do not rewind a running backend. Restart the stack per pass instead; `xgo_localization_demo`'s `LOOP=true` does exactly that |
 | Pose drifts steadily to one side | laser mount not level | re-measure `laser_transform`, especially roll and pitch |
 | Topics at `/pose` instead of `/localization/pose` | node started with `ros2 run` | use the launch file; it supplies the namespace |
 | A viewer reports `base_laser` missing but SLAM works fine | joined after the one-shot static transform | should self-heal within `static_tf_period_s`; if not, reconnect |

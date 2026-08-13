@@ -321,10 +321,34 @@ class LocalizationNode(Node):
             return None
         return _pose_from_transform(tf)
 
+    def _on_clock_loop(self) -> None:
+        """Drop everything cached against the pre-loop clock.
+
+        The TF buffer is the important one. tf2 keeps the newest transform per
+        edge, and the previous pass's ``map -> odom`` is newer — by its stamp —
+        than anything the restarted run has published yet, so a plain lookup
+        keeps returning it and the correction never appears to refresh.
+
+        The odometry resets itself off the IMU stamps, which jump back on the
+        same tick, so it is left alone here.
+        """
+        self._tf_buffer.clear()
+        self._last_correction = None
+        self.get_logger().info(
+            'clock jumped backwards — replay looped; cleared TF and the backend '
+            'correction, odometry restarts from the origin')
+
     def _publish_pose(self) -> None:
         """Emit the global pose and health, at a constant rate regardless of the backend."""
         now = self.get_clock().now()
         now_s = now.nanoseconds * 1e-9
+
+        # A bag replayed with --loop restarts the clock. Everything cached
+        # against the old one has to go before it is read again, or the previous
+        # pass's transforms — stamped far ahead of the restarted clock — are
+        # what every lookup below returns.
+        if self._arbiter.note_time(now_s):
+            self._on_clock_loop()
 
         # Track backend freshness first: this is what decides health, and it
         # refreshes the cached correction used by the fallback below.
